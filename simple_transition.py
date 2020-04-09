@@ -64,7 +64,7 @@ def initialize(seed):
     return svi.loss(model, global_guide, data)
 
 loss, seed = min((initialize(seed), seed) for seed in range(100))
-#initialize(100)
+initialize(100)
 print('seed = {}, initial_loss = {}'.format(seed, loss))
 
 gradient_norms = defaultdict(list)
@@ -74,9 +74,9 @@ for name, value in pyro.get_param_store().named_parameters():
 losses = []
 for i in range(10000):
     loss = svi.step(data)
-    print(loss)
     losses.append(loss)
-    print('.' if i % 100 else '\n', end='')
+    if i % 100 == 0 :
+        print(loss)
 
 map_estimates = global_guide(data)
 alphas = map_estimates['alpha']
