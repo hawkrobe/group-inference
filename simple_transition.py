@@ -15,6 +15,8 @@ from pyro.optim import Adam
 from pyro.infer import SVI, TraceEnum_ELBO, config_enumerate, infer_discrete
 from pyro.ops.indexing import Vindex
 
+# change for demonstration purposes?
+
 pyro.enable_validation(True)
 
 def generate_data(group) :
