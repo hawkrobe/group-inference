@@ -15,7 +15,7 @@ from pyro.optim import Adam
 from pyro.infer import SVI, TraceEnum_ELBO, config_enumerate, infer_discrete
 from pyro.ops.indexing import Vindex
 
-# change for demonstration purposes?
+# change for from collections import defaultdict  demonstration purposes?
 
 pyro.enable_validation(True)
 
