@@ -171,10 +171,13 @@ def tomtom_svi(data):
     print('\n final loss: {}\n'.format(losses[-1]))
 
     # code chunk to calculate the likelihood of data once model is fitted
-    guide_trace = poutine.trace(global_guide).get_trace(data)
-    model_trace = poutine.trace(poutine.replay(model, trace=guide_trace)).get_trace(data)
-    logprob_estimate = model_trace.log_prob_sum() - guide_trace.log_prob_sum()
-
+    # modified to take a sample of log prob for each model
+    lp_iter = []
+    for i in range(500):
+        guide_trace = poutine.trace(global_guide).get_trace(data)
+        model_trace = poutine.trace(poutine.replay(model, trace=guide_trace)).get_trace(data)
+        lp_iter.append(model_trace.log_prob_sum() - guide_trace.log_prob_sum())
+    logprob_estimate = sum(lp_iter)/len(lp_iter)
     # code chunk to return
     map_estimates = global_guide(data)
     if 'gr' in mtype:
