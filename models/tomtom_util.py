@@ -292,3 +292,41 @@ def data_log_prob_dim(data, mmap, dtype):
         total_log_prob.append(np.log(sum_p_prob))
     sum_total_log_prob = sum(sum(total_log_prob))
     return sum_total_log_prob
+
+def cross_matrix_pairwise(mat_grp, mat_dim):
+    # contains two symmetric triangle for indexing ease
+    # initialize empty cor matrix for storage
+    cor_mat = np.zeros([mat_grp.shape[0],mat_dim.shape[0]])-999
+    for i in range(mat_grp.shape[0]):
+        for j in range(mat_dim.shape[0]):
+            corr = scipy.stats.pearsonr(mat_grp[i],mat_dim[j])
+            cor_mat[i,j] = corr[0]
+    return cor_mat
+
+def grp_dim_param_convergence(map_grp, map_dim, dtype):
+    """
+    Takes in two maps (dict)
+    Spits out pair-wise correlation of the corresponding parameters between grp and dim models
+    """
+    nfactor = map_grp['weights'].shape[0]
+    # print out the weights of the two models for visual inspection, see if there's need to quantify
+    print('grp weights: ', map_grp['weights'])
+    print('dim weights: ', map_dim['topic_weights'])
+    # flatten out relevant parameter tensors to nfactor * item 2d matrices
+    if dtype == 'norm':
+        nitem = map_grp['concentration'].shape[1] * map_grp['concentration'].shape[2]
+        conc_grp = map_grp['concentration'].detach().numpy().reshape(nfactor,nitem)
+        conc_dim = map_dim['topic_concentration'].detach().numpy().reshape(nfactor,nitem)
+    elif dtype == 'raw':
+        nitem = map_grp['alpha'].shape[1] * map_grp['alpha'].shape[2]
+        a_grp = map_grp['alpha'].detach().numpy().reshape(nfactor,nitem)
+        a_dim = map_grp['beta'].detach().numpy().reshape(nfactor,nitem)
+        b_grp = map_dim['topic_a'].detach().numpy().reshape(nfactor,nitem)
+        b_dim = map_dim['topic_b'].detach().numpy().reshape(nfactor,nitem)
+    # calculate pair-wise correlation across corresponding params
+    if dtype == 'norm':
+        param_cors = cross_matrix_pairwise(conc_grp,conc_dim)
+    elif dtype == 'raw':
+        param_cors.a = cross_matrix_pairwise(a_grp,a_dim)
+        param_cors.b = cross_matrix_pairwise(b_grp,b_dim)
+    return param_cors
