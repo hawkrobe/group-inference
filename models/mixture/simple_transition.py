@@ -41,7 +41,6 @@ K = 2  # Fixed number of components.
 def model(data):
     # Background probability of different groups (assume equally likely)
     weights = torch.tensor([0.5, 0.5])
-#    scale = pyro.sample('scale', dist.LogNormal(torch.zeros(4), 2. * torch.ones(4)).to_event(1))
     with pyro.plate('components', K):
         # concentration parameters
         alphas = pyro.sample('alpha', dist.Gamma(2 * torch.ones(4), 1/3 * torch.ones(4)).to_event(1))
@@ -52,8 +51,22 @@ def model(data):
         assignment = pyro.sample('assignment', dist.Categorical(weights))
         d = dist.Beta(alphas[assignment], betas[assignment])
         pyro.sample('obs', d.to_event(1), obs=data)
-        
 
+def model_single_obs(obs, i, j):
+    # Background probability of different groups (assume equally likely)
+    weights = torch.tensor([0.5, 0.5])
+    with pyro.plate('components', K):
+        # concentration parameters
+        alphas = pyro.sample('alpha', dist.Gamma(2 * torch.ones(4), 1/3 * torch.ones(4)).to_event(1))
+        betas = pyro.sample('beta', dist.Gamma(2 * torch.ones(4), 1/3 * torch.ones(4)).to_event(1))
+
+    # Local variables.
+    assignment = pyro.sample('assignment', dist.Categorical(weights))
+    betas = dist.Beta(alphas[assignment], betas[assignment])
+    pyro.sample('obs',
+                betas[torch.LongTensor(i), torch.LongTensor(j)],
+                obs=obs)
+       
 optim = pyro.optim.Adam({'lr': 0.0005, 'betas': [0.8, 0.99]})
 elbo = TraceEnum_ELBO(max_plate_nesting=1)
 
