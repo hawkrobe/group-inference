@@ -26,7 +26,7 @@ def mix_weights(beta):
     beta1m_cumprod = (1 - beta).cumprod(-1)
     return F.pad(beta, (0, 1), value=1) * F.pad(beta1m_cumprod, (1, 0), value=1)
 
-@config_enumerate()
+@config_enumerate
 def model(data):
     # some parameters can be directly derived from the data passed
     # K = 2
@@ -144,17 +144,19 @@ def get_membership(model, guide, data, temperature=0):
     return trace.nodes["assignment"]["value"]
 
 # define a code chunk that does the SVI step for singel variation
-def tomtom_svi(data):
+def tomtom_svi(data, print_fit = True):
     pyro.clear_param_store()
 
     #declare dataset to be modeled
     dtname = 't{}_{}_{}_3d'.format(target, dtype, auto)
-    print("running SVI with: {}".format(dtname))
+    if print_fit:
+        print("running SVI with: {}".format(dtname))
     # data = globals()[dtname]
 
     loss, seed = min((initialize(seed,model,data), seed) for seed in range(100))
     initialize(seed,model,data)
-    print('seed = {}, initial_loss = {}'.format(seed, loss))
+    if print_fit:
+        print('seed = {}, initial_loss = {}'.format(seed, loss))
 
     gradient_norms = defaultdict(list)
     for name, value in pyro.get_param_store().named_parameters():
@@ -165,10 +167,11 @@ def tomtom_svi(data):
         loss = svi.step(data)
         #print(loss)
         losses.append(loss)
-        if i % 100 == 0:
+        if print_fit and i % 100 == 0:
             print('.',end = '')
 #             print(loss)
-    print('\n final loss: {}\n'.format(losses[-1]))
+    if print_fit:
+        print('\n final loss: {}\n'.format(losses[-1]))
 
     # code chunk to calculate the likelihood of data once model is fitted
     # modified to take a sample of log prob for each model
@@ -208,7 +211,6 @@ def tomtom_mcmc(data,seed,nsample = 5000, burnin = 1000):
     posterior_samples = mcmc.get_samples()
     return posterior_samples
 
-mtype = 1
 
 def somebullshit():
     print(mtype)

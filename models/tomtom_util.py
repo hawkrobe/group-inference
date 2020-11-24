@@ -309,9 +309,9 @@ def grp_dim_param_convergence(map_grp, map_dim, dtype):
     Spits out pair-wise correlation of the corresponding parameters between grp and dim models
     """
     nfactor = map_grp['weights'].shape[0]
-    # print out the weights of the two models for visual inspection, see if there's need to quantify
-    print('grp weights: ', map_grp['weights'])
-    print('dim weights: ', map_dim['topic_weights'])
+    # # print out the weights of the two models for visual inspection, see if there's need to quantify
+    # print('grp weights: ', map_grp['weights'])
+    # print('dim weights: ', map_dim['topic_weights'])
     # flatten out relevant parameter tensors to nfactor * item 2d matrices
     if dtype == 'norm':
         nitem = map_grp['concentration'].shape[1] * map_grp['concentration'].shape[2]
@@ -320,13 +320,29 @@ def grp_dim_param_convergence(map_grp, map_dim, dtype):
     elif dtype == 'raw':
         nitem = map_grp['alpha'].shape[1] * map_grp['alpha'].shape[2]
         a_grp = map_grp['alpha'].detach().numpy().reshape(nfactor,nitem)
-        a_dim = map_grp['beta'].detach().numpy().reshape(nfactor,nitem)
-        b_grp = map_dim['topic_a'].detach().numpy().reshape(nfactor,nitem)
+        a_dim = map_dim['topic_a'].detach().numpy().reshape(nfactor,nitem)
+        b_grp = map_grp['beta'].detach().numpy().reshape(nfactor,nitem)
         b_dim = map_dim['topic_b'].detach().numpy().reshape(nfactor,nitem)
     # calculate pair-wise correlation across corresponding params
     if dtype == 'norm':
         param_cors = cross_matrix_pairwise(conc_grp,conc_dim)
     elif dtype == 'raw':
-        param_cors.a = cross_matrix_pairwise(a_grp,a_dim)
-        param_cors.b = cross_matrix_pairwise(b_grp,b_dim)
+        param_cors = {}
+        param_cors['a'] = cross_matrix_pairwise(a_grp,a_dim)
+        param_cors['b'] = cross_matrix_pairwise(b_grp,b_dim)
     return param_cors
+
+def one_to_one_correspondence(cor_mat):
+    """
+    takes in cross_matrix_pairwise results
+    for each row, find index of maximal correlation
+    if indmax are unique across rows or columns, there might be 1-1 correspondence between grps and dims
+    returns 1) indmax[byrow, bycol] and 2)allunique[byrow, bycol]
+    """
+    byrow = cor_mat.argmax(axis = 1)
+    bycol = cor_mat.argmax(axis = 0)
+    indmax = [byrow, bycol]
+    otorow = len(list(set(byrow))) == len(byrow) # are all max's unique
+    otocol = len(list(set(bycol))) == len(bycol)
+    allunique = [otorow,otocol]
+    return indmax, allunique
