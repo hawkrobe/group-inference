@@ -23,7 +23,7 @@ unrestrained,confident,1
 unrestrained,grouchy,1
 unrestrained,sad,1
 unrestrained,assertive,1
-unrestrained,unrestrained,2
+unrestrained,unrestrained,1
 bold,nervous,2
 bold,irritable,2
 bold,lively,2
@@ -48,7 +48,7 @@ talkative,nervous,2
 talkative,irritable,2
 talkative,lively,2
 talkative,bold,2
-talkative,talkative,3
+talkative,talkative,2
 contempt,satisfaction,3
 contempt,love,3
 contempt,contempt,3

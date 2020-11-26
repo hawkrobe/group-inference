@@ -19,6 +19,7 @@ from pyro.optim import Adam
 from pyro.infer import SVI, TraceEnum_ELBO, config_enumerate, infer_discrete, Predictive
 from pyro.ops.indexing import Vindex
 from pyro.infer import MCMC, NUTS
+import torch.nn.functional as F
 
 # define a model function that's dynamically declared
 
