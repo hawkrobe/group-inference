@@ -51,9 +51,13 @@ with open('tomtom_data_preprocessed.pkl','rb') as f:
     tavg_norm_all_3d, tavg_norm_noauto_3d, tavg_raw_all_3d, tavg_raw_noauto_3d] = pickle.load(f)
 # import pickled parameters from varying-k analysis
 with open('tomtom_fitted_models.pkl','rb') as f:
-    [seeds_self_norm_all_grp,maps_self_norm_all_grp,logprobs_self_norm_all_grp,mem_self_norm_all_grp,
+    [seeds_self_norm_all_grp,maps_self_norm_all_grp,logprobs_self_norm_all_grp,mems_self_norm_all_grp,
      seeds_self_norm_all_dim,maps_self_norm_all_dim,logprobs_self_norm_all_dim,
-     seeds_self_raw_noauto_grp,maps_self_raw_noauto_grp,logprobs_self_raw_noauto_grp,mem_self_raw_noauto_grp,
+     seeds_self_norm_noauto_grp,maps_self_norm_noauto_grp,logprobs_self_norm_noauto_grp,mems_self_norm_noauto_grp,
+     seeds_self_norm_noauto_dim,maps_self_norm_noauto_dim,logprobs_self_norm_noauto_dim,
+     seeds_self_raw_all_grp,maps_self_raw_all_grp,logprobs_self_raw_all_grp,mems_self_raw_all_grp,
+     seeds_self_raw_all_dim,maps_self_raw_all_dim,logprobs_self_raw_all_dim,
+     seeds_self_raw_noauto_grp,maps_self_raw_noauto_grp,logprobs_self_raw_noauto_grp,mems_self_raw_noauto_grp,
      seeds_self_raw_noauto_dim,maps_self_raw_noauto_dim,logprobs_self_raw_noauto_dim] = pickle.load(f)
 
 # # load previously generated data

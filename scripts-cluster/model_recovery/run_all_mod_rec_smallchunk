@@ -4,6 +4,10 @@ for segind in {0..9}
 do
 # sbatch sbatch_mod_rec_norm_all_grp_parallel_smallchunk $segind
 # sbatch sbatch_mod_rec_norm_all_dim_parallel_smallchunk $segind
-sbatch sbatch_mod_rec_raw_noauto_grp_parallel_smallchunk $segind
-sbatch sbatch_mod_rec_raw_noauto_dim_parallel_smallchunk $segind
+# sbatch sbatch_mod_rec_raw_noauto_grp_parallel_smallchunk $segind
+# sbatch sbatch_mod_rec_raw_noauto_dim_parallel_smallchunk $segind
+sbatch sbatch_mod_rec_norm_noauto_grp_parallel_smallchunk $segind
+sbatch sbatch_mod_rec_norm_noauto_dim_parallel_smallchunk $segind
+sbatch sbatch_mod_rec_raw_all_grp_parallel_smallchunk $segind
+sbatch sbatch_mod_rec_raw_all_dim_parallel_smallchunk $segind
 done

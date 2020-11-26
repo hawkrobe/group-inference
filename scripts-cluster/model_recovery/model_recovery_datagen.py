@@ -60,19 +60,6 @@ with open('tomtom_fitted_models.pkl','rb') as f:
      seeds_self_raw_noauto_grp,maps_self_raw_noauto_grp,logprobs_self_raw_noauto_grp,mems_self_raw_noauto_grp,
      seeds_self_raw_noauto_dim,maps_self_raw_noauto_dim,logprobs_self_raw_noauto_dim] = pickle.load(f)
 
-# # load previously generated data
-# with open('model_recovery_gen_dat.pkl','rb') as f:
-#     [gendat_self_norm_all_grp,gendat_self_norm_all_dim,
-#     gendat_self_raw_noauto_grp,gendat_self_raw_noauto_dim] = pickle.load(f)
-
-# load previously generated smaller set of data
-with open('model_recovery_gen_dat_small.pkl','rb') as f:
-    [gendat_self_norm_all_grp,gendat_self_norm_all_dim,
-    gendat_self_raw_noauto_grp,gendat_self_raw_noauto_dim,
-    gendat_self_norm_noauto_grp,gendat_self_norm_noauto_dim,
-    gendat_self_raw_all_grp,gendat_self_raw_all_dim] = pickle.load(f)
-print('Read in small dataset!')
-
 # code to generate data from params
 # define separate functions for group model and dimension model
 #  group
@@ -155,112 +142,21 @@ def datagen_combo(maps, mtype, n_repeat, n_sample_array):
         stor1.append(stor2)
     return stor1
 
-# random.seed(20201103)
-# gendat_self_norm_all_grp = datagen_combo(maps_self_norm_all_grp, 'grp', n_repeat, n_sample_array)
-# gendat_self_norm_all_dim = datagen_combo(maps_self_norm_all_dim, 'dim', n_repeat, n_sample_array)
-# gendat_self_raw_noauto_grp = datagen_combo(maps_self_raw_noauto_grp, 'grp', n_repeat, n_sample_array)
-# gendat_self_raw_noauto_dim = datagen_combo(maps_self_raw_noauto_dim, 'dim', n_repeat, n_sample_array)
-#
-# # pickle generated data
-# with open('model_recovery_gen_dat_small.pkl','wb') as f:
-#     pickle.dump([gendat_self_norm_all_grp,gendat_self_norm_all_dim,
-#                 gendat_self_raw_noauto_grp,gendat_self_raw_noauto_dim],f)
-# print('done with new small set data generation!')
+random.seed(20201103)
+gendat_self_norm_all_grp = datagen_combo(maps_self_norm_all_grp, 'grp', n_repeat, n_sample_array)
+gendat_self_norm_all_dim = datagen_combo(maps_self_norm_all_dim, 'dim', n_repeat, n_sample_array)
+gendat_self_raw_noauto_grp = datagen_combo(maps_self_raw_noauto_grp, 'grp', n_repeat, n_sample_array)
+gendat_self_raw_noauto_dim = datagen_combo(maps_self_raw_noauto_dim, 'dim', n_repeat, n_sample_array)
+# added 11/26/2020, generate data for norm_noauto and raw_all models
+gendat_self_norm_noauto_grp = datagen_combo(maps_self_norm_noauto_grp, 'grp', n_repeat, n_sample_array)
+gendat_self_norm_noauto_dim = datagen_combo(maps_self_norm_noauto_dim, 'dim', n_repeat, n_sample_array)
+gendat_self_raw_all_grp = datagen_combo(maps_self_raw_all_grp, 'grp', n_repeat, n_sample_array)
+gendat_self_raw_all_dim = datagen_combo(maps_self_raw_all_dim, 'dim', n_repeat, n_sample_array)
 
-## define function to detach parameter estimates so results can be sent back from multiprocessiong
-def detach_mmap(mmap):
-    for k in mmap.keys():
-        mmap[k] = mmap[k].detach()
-    return mmap
-
-# ### defining function that iteratively refit the model
-# def tomtom_refit(gendat, print_fit = False):
-#     modrec_seeds = []
-#     modrec_maps = []
-#     modrec_logprobs = []
-#     tm.K = 1
-#     for kmap in gendat:
-#         print('Currently refitting {} model with K={}'.format(tm.mtype, tm.K))
-#         # each element in the second layer is a tensor nrep*nsample*datadim
-#         stor1_seeds = []
-#         stor1_maps = []
-#         stor1_logprobs = []
-#         for tn in np.arange(len(kmap)):
-#             print('Where sample size is {}'.format(n_sample_array[tn]))
-#             # iterate through the first dimension of the tensor, fitting model for each layer
-#             stor2_seeds = []
-#             stor2_maps = []
-#             stor2_logprobs = []
-#             tens = kmap[tn]
-#             for i in np.arange(tens.shape[0]):
-#                 if 'gr' in tm.mtype:
-#                     seed, mmap, mem, lp = tm.tomtom_svi(tens[i], print_fit = print_fit)
-#                 elif 'di' in tm.mtype:
-#                     seed, mmap, lp = tm.tomtom_svi(tens[i], print_fit = print_fit)
-#                 stor2_seeds.append(seed)
-#                 stor2_maps.append(mmap)
-#                 stor2_logprobs.append(lp)
-#             stor1_seeds.append(stor2_seeds)
-#             stor1_maps.append(stor2_maps)
-#             stor1_logprobs.append(stor2_logprobs)
-#         modrec_seeds.append(stor1_seeds)
-#         modrec_maps.append(stor1_maps)
-#         modrec_logprobs.append(stor1_logprobs)
-#         tm.K += 1
-#     return modrec_seeds, modrec_maps, modrec_logprobs
-
-## redefining tomtom_refit for multiprocessiong
-def tomtom_refit(zipkmap):
-    tm.K = zipkmap[0]
-    kmap = zipkmap[1]
-    print('Currently refitting {} model with K={}'.format(tm.mtype, tm.K),flush=True)
-    # each element in the second layer is a tensor nrep*nsample*datadim
-    stor1_seeds = []
-    stor1_maps = []
-    stor1_logprobs = []
-    for tn in np.arange(len(kmap)):
-        print('Where K = {} and sample size is {}'.format(tm.K, n_sample_array[tn]),flush=True)
-        # iterate through the first dimension of the tensor, fitting model for each layer
-        stor2_seeds = []
-        stor2_maps = []
-        stor2_logprobs = []
-        tens = kmap[tn]
-        for i in np.arange(tens.shape[0]):
-            if 'gr' in tm.mtype:
-                seed, mmap, mem, lp = tm.tomtom_svi(tens[i], print_fit = False)
-            elif 'di' in tm.mtype:
-                seed, mmap, lp = tm.tomtom_svi(tens[i], print_fit = False)
-            stor2_seeds.append(seed)
-            stor2_maps.append(detach_mmap(mmap))
-            stor2_logprobs.append(lp.detach())
-        stor1_seeds.append(stor2_seeds)
-        stor1_maps.append(stor2_maps)
-        stor1_logprobs.append(stor2_logprobs)
-    return stor1_seeds,stor1_maps,stor1_logprobs
-
-
-# norm all dim
-tm.mtype = 'group'
-tm.target = 'self' # 'self','targ','avg'
-tm.dtype = 'raw' # 'norm','raw'
-tm.auto = 'noauto' # 'noauto','all'
-tm.stickbreak = False
-tm.optim = pyro.optim.Adam({'lr': 0.0005, 'betas': [0.8, 0.99]})
-tm.elbo = TraceEnum_ELBO(max_plate_nesting=1)
-
-# modrec_seeds_self_raw_noauto_grp, modrec_maps_self_raw_noauto_grp, modrec_logprobs_self_raw_noauto_grp = tomtom_refit(gendat_self_raw_noauto_grp)
-import multiprocessing
-# zip each element of gendat with its associated K for ease of pooling
-def zip_gendat(gendat):
-    return [(i+1, gendat[i]) for i in range(len(gendat))]
-gendat = zip_gendat(gendat_self_raw_noauto_grp)
-# pooling
-pool = multiprocessing.Pool()
-poolout = pool.map(tomtom_refit,gendat)
-modrec_seeds_self_raw_noauto_grp = [i[0] for i in poolout]
-modrec_maps_self_raw_noauto_grp = [i[1] for i in poolout]
-modrec_logprobs_self_raw_noauto_grp = [i[2] for i in poolout]
-
-# save
-with open('modrec_self_raw_noauto_grp.pkl','wb') as f:
-    pickle.dump([modrec_seeds_self_raw_noauto_grp,modrec_maps_self_raw_noauto_grp,modrec_logprobs_self_raw_noauto_grp],f)
+# pickle generated data
+with open('model_recovery_gen_dat_small.pkl','wb') as f:
+    pickle.dump([gendat_self_norm_all_grp,gendat_self_norm_all_dim,
+                gendat_self_raw_noauto_grp,gendat_self_raw_noauto_dim,
+                gendat_self_norm_noauto_grp,gendat_self_norm_noauto_dim,
+                gendat_self_raw_all_grp,gendat_self_raw_all_dim],f)
+print('done with new small set data generation!')

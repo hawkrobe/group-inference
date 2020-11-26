@@ -253,14 +253,14 @@ import multiprocessing
 # zip each element of gendat with its associated K for ease of pooling
 def zip_gendat(gendat):
     return [(i+1, gendat[i]) for i in range(len(gendat))]
-gendat = zip_gendat(gendat_self_raw_noauto_grp)
+gendat = zip_gendat(gendat_self_raw_all_grp)
 # pooling
 pool = multiprocessing.Pool()
 poolout = pool.map(tomtom_refit,gendat)
-modrec_seeds_self_raw_noauto_grp = [i[0] for i in poolout]
-modrec_maps_self_raw_noauto_grp = [i[1] for i in poolout]
-modrec_logprobs_self_raw_noauto_grp = [i[2] for i in poolout]
+modrec_seeds_self_raw_all_grp = [i[0] for i in poolout]
+modrec_maps_self_raw_all_grp = [i[1] for i in poolout]
+modrec_logprobs_self_raw_all_grp = [i[2] for i in poolout]
 
 # save
-with open('modrec_self_raw_noauto_grp.pkl','wb') as f:
-    pickle.dump([modrec_seeds_self_raw_noauto_grp,modrec_maps_self_raw_noauto_grp,modrec_logprobs_self_raw_noauto_grp],f)
+with open('modrec_self_raw_all_grp.pkl','wb') as f:
+    pickle.dump([modrec_seeds_self_raw_all_grp,modrec_maps_self_raw_all_grp,modrec_logprobs_self_raw_all_grp],f)

@@ -1,6 +1,7 @@
 ##### import packages
 #base
 import os
+import sys
 from collections import defaultdict
 import numpy as np
 import scipy.stats
@@ -209,58 +210,102 @@ def detach_mmap(mmap):
 #         tm.K += 1
 #     return modrec_seeds, modrec_maps, modrec_logprobs
 
-## redefining tomtom_refit for multiprocessiong
-def tomtom_refit(zipkmap):
-    tm.K = zipkmap[0]
-    kmap = zipkmap[1]
-    print('Currently refitting {} model with K={}'.format(tm.mtype, tm.K),flush=True)
-    # each element in the second layer is a tensor nrep*nsample*datadim
-    stor1_seeds = []
-    stor1_maps = []
-    stor1_logprobs = []
-    for tn in np.arange(len(kmap)):
-        print('Where K = {} and sample size is {}'.format(tm.K, n_sample_array[tn]),flush=True)
-        # iterate through the first dimension of the tensor, fitting model for each layer
-        stor2_seeds = []
-        stor2_maps = []
-        stor2_logprobs = []
-        tens = kmap[tn]
-        for i in np.arange(tens.shape[0]):
-            if 'gr' in tm.mtype:
-                seed, mmap, mem, lp = tm.tomtom_svi(tens[i], print_fit = False)
-            elif 'di' in tm.mtype:
-                seed, mmap, lp = tm.tomtom_svi(tens[i], print_fit = False)
-            stor2_seeds.append(seed)
-            stor2_maps.append(detach_mmap(mmap))
-            stor2_logprobs.append(lp.detach())
-        stor1_seeds.append(stor2_seeds)
-        stor1_maps.append(stor2_maps)
-        stor1_logprobs.append(stor2_logprobs)
-    return stor1_seeds,stor1_maps,stor1_logprobs
+# ## redefining tomtom_refit for multiprocessiong
+# def tomtom_refit(zipkmap):
+#     tm.K = zipkmap[0]
+#     kmap = zipkmap[1]
+#     print('Currently refitting {} model with K={}'.format(tm.mtype, tm.K),flush=True)
+#     # each element in the second layer is a tensor nrep*nsample*datadim
+#     stor1_seeds = []
+#     stor1_maps = []
+#     stor1_logprobs = []
+#     for tn in np.arange(len(kmap)):
+#         print('Where K = {} and sample size is {}'.format(tm.K, n_sample_array[tn]),flush=True)
+#         # iterate through the first dimension of the tensor, fitting model for each layer
+#         stor2_seeds = []
+#         stor2_maps = []
+#         stor2_logprobs = []
+#         tens = kmap[tn]
+#         for i in np.arange(tens.shape[0]):
+#             if 'gr' in tm.mtype:
+#                 seed, mmap, mem, lp = tm.tomtom_svi(tens[i], print_fit = False)
+#             elif 'di' in tm.mtype:
+#                 seed, mmap, lp = tm.tomtom_svi(tens[i], print_fit = False)
+#             stor2_seeds.append(seed)
+#             stor2_maps.append(mmap)
+#             stor2_logprobs.append(lp)
+#         stor1_seeds.append(stor2_seeds)
+#         stor1_maps.append(stor2_maps)
+#         stor1_logprobs.append(stor2_logprobs)
+#     return stor1_seeds,stor1_maps,stor1_logprobs
 
+# rewriting again to parallel on, and therefore return smaller chunks
+# now take in all tensors for a single K + N_sample combo (n_repeat tensor)
+def tomtom_refit(tens):
+    print('Where K = {} and sample size is {}'.format(tm.K, tens.shape[1]),flush=True)
+    # iterate through the first dimension of the tensor, fitting model for each layer
+    stor2_seeds = []
+    stor2_maps = []
+    stor2_logprobs = []
+    # tens = kmap[tn]
+    for i in np.arange(tens.shape[0]):
+        if 'gr' in tm.mtype:
+            seed, mmap, mem, lp = tm.tomtom_svi(tens[i], print_fit = False)
+        elif 'di' in tm.mtype:
+            seed, mmap, lp = tm.tomtom_svi(tens[i], print_fit = False)
+        stor2_seeds.append(seed)
+        stor2_maps.append(detach_mmap(mmap))
+        stor2_logprobs.append(lp.detach())
+    return stor2_seeds,stor2_maps,stor2_logprobs
 
 # norm all dim
-tm.mtype = 'group'
+tm.mtype = 'dimension'
 tm.target = 'self' # 'self','targ','avg'
-tm.dtype = 'raw' # 'norm','raw'
+tm.dtype = 'norm' # 'norm','raw'
 tm.auto = 'noauto' # 'noauto','all'
 tm.stickbreak = False
 tm.optim = pyro.optim.Adam({'lr': 0.0005, 'betas': [0.8, 0.99]})
 tm.elbo = TraceEnum_ELBO(max_plate_nesting=1)
 
-# modrec_seeds_self_raw_noauto_grp, modrec_maps_self_raw_noauto_grp, modrec_logprobs_self_raw_noauto_grp = tomtom_refit(gendat_self_raw_noauto_grp)
+# modrec_seeds_self_norm_all_grp, modrec_maps_self_norm_all_grp, modrec_logprobs_self_norm_all_grp = tomtom_refit(gendat_self_norm_all_grp)
 import multiprocessing
-# zip each element of gendat with its associated K for ease of pooling
-def zip_gendat(gendat):
-    return [(i+1, gendat[i]) for i in range(len(gendat))]
-gendat = zip_gendat(gendat_self_raw_noauto_grp)
-# pooling
-pool = multiprocessing.Pool()
-poolout = pool.map(tomtom_refit,gendat)
-modrec_seeds_self_raw_noauto_grp = [i[0] for i in poolout]
-modrec_maps_self_raw_noauto_grp = [i[1] for i in poolout]
-modrec_logprobs_self_raw_noauto_grp = [i[2] for i in poolout]
+# # zip each element of gendat with its associated K for ease of pooling
+# def zip_gendat(gendat):
+#     return [(i+1, gendat[i]) for i in range(len(gendat))]
+# gendat = zip_gendat(gendat_self_norm_all_grp)
+# # pooling
+# pool = multiprocessing.Pool()
+# poolout = pool.map(tomtom_refit,gendat)
+# modrec_seeds_self_norm_all_grp = [i[0] for i in poolout]
+# modrec_maps_self_norm_all_grp = [i[1] for i in poolout]
+# modrec_logprobs_self_norm_all_grp = [i[2] for i in poolout]
+
+# re writing for paralleling on smaller chunks
+modrec_seeds = []
+modrec_maps = []
+modrec_logprobs = []
+kgroup = int(sys.argv[1])
+gendat = gendat_self_norm_noauto_dim
+kmap = gendat[kgroup]
+for kval in np.arange(len(gendat)):
+    tm.K = kval + 1
+    print('Currently refitting {} model with K={}'.format(tm.mtype, tm.K))
+    # pooling
+    pool = torch.multiprocessing.Pool()
+    poolout = pool.map(tomtom_refit,kmap)
+    stor1_seeds = [i[0] for i in poolout]
+    stor1_maps = [i[1] for i in poolout]
+    stor1_logprobs = [i[2] for i in poolout]
+    # print(stor1_seeds)
+    # print(stor1_maps)
+    # print(stor1_logprobs)
+    modrec_seeds.append(stor1_seeds)
+    modrec_maps.append(stor1_maps)
+    modrec_logprobs.append(stor1_logprobs)
+
+
 
 # save
-with open('modrec_self_raw_noauto_grp.pkl','wb') as f:
-    pickle.dump([modrec_seeds_self_raw_noauto_grp,modrec_maps_self_raw_noauto_grp,modrec_logprobs_self_raw_noauto_grp],f)
+fname = 'modrec_self_norm_noauto_dim_cross_k{}.pkl'.format(kgroup)
+with open(fname,'wb') as f:
+    pickle.dump([modrec_seeds,modrec_maps,modrec_logprobs],f)

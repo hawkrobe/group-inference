@@ -26,6 +26,11 @@ import pickle
 import torch.nn.functional as F
 from itertools import combinations
 
+# some variable shared by several utility functions
+states = pd.read_csv('data/states.csv') # there's probably a better place to put this
+states['statepair'] = states['state1'] + '_' + states['state2']# construct state pair strings
+states.head()
+
 def mix_weights(beta):
     beta1m_cumprod = (1 - beta).cumprod(-1)
     return F.pad(beta, (0, 1), value=1) * F.pad(beta1m_cumprod, (1, 0), value=1)
@@ -68,9 +73,6 @@ def draw_density_group(data, mmap, mmem):
 
 def draw_density_better_group(data, mmap, mmem):
     # draw 3 5*5s, including state labels
-    states = pd.read_csv('data/states.csv') # there's probably a better place to put this
-    states['statepair'] = states['state1'] + '_' + states['state2']# construct state pair strings
-    states.head()
 #    data = globals()['t{}_{}_{}_3d'.format(target, norm, auto)]
 #     mmap = vars()['map_{}_{}_{}'.format(target, norm, auto)]
 #     mmem = vars()['mem_{}_{}_{}'.format(target, norm, auto)]

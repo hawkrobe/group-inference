@@ -240,27 +240,27 @@ def tomtom_refit(zipkmap):
 
 
 # norm all dim
-tm.mtype = 'group'
+tm.mtype = 'dimension'
 tm.target = 'self' # 'self','targ','avg'
-tm.dtype = 'raw' # 'norm','raw'
+tm.dtype = 'norm' # 'norm','raw'
 tm.auto = 'noauto' # 'noauto','all'
 tm.stickbreak = False
 tm.optim = pyro.optim.Adam({'lr': 0.0005, 'betas': [0.8, 0.99]})
 tm.elbo = TraceEnum_ELBO(max_plate_nesting=1)
 
-# modrec_seeds_self_raw_noauto_grp, modrec_maps_self_raw_noauto_grp, modrec_logprobs_self_raw_noauto_grp = tomtom_refit(gendat_self_raw_noauto_grp)
+# modrec_seeds_self_norm_all_dim, modrec_maps_self_norm_all_dim, modrec_logprobs_self_norm_all_dim = tomtom_refit(gendat_self_norm_all_dim)
 import multiprocessing
 # zip each element of gendat with its associated K for ease of pooling
 def zip_gendat(gendat):
     return [(i+1, gendat[i]) for i in range(len(gendat))]
-gendat = zip_gendat(gendat_self_raw_noauto_grp)
+gendat = zip_gendat(gendat_self_norm_noauto_dim)
 # pooling
 pool = multiprocessing.Pool()
 poolout = pool.map(tomtom_refit,gendat)
-modrec_seeds_self_raw_noauto_grp = [i[0] for i in poolout]
-modrec_maps_self_raw_noauto_grp = [i[1] for i in poolout]
-modrec_logprobs_self_raw_noauto_grp = [i[2] for i in poolout]
+modrec_seeds_self_norm_noauto_dim = [i[0] for i in poolout]
+modrec_maps_self_norm_noauto_dim = [i[1] for i in poolout]
+modrec_logprobs_self_norm_noauto_dim = [i[2] for i in poolout]
 
 # save
-with open('modrec_self_raw_noauto_grp.pkl','wb') as f:
-    pickle.dump([modrec_seeds_self_raw_noauto_grp,modrec_maps_self_raw_noauto_grp,modrec_logprobs_self_raw_noauto_grp],f)
+with open('modrec_self_norm_noauto_dim.pkl','wb') as f:
+    pickle.dump([modrec_seeds_self_norm_noauto_dim,modrec_maps_self_norm_noauto_dim,modrec_logprobs_self_norm_noauto_dim],f)
