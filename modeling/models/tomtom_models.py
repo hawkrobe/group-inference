@@ -145,7 +145,8 @@ def get_membership(model, guide, data, temperature=0):
     return trace.nodes["assignment"]["value"]
 
 # define a code chunk that does the SVI step for singel variation
-def tomtom_svi(data, print_fit = True):
+# define a code chunk that does the SVI step for singel variation
+def tomtom_svi(data, print_fit = True, return_guide = False):
     pyro.clear_param_store()
 
     #declare dataset to be modeled
@@ -184,12 +185,20 @@ def tomtom_svi(data, print_fit = True):
     logprob_estimate = sum(lp_iter)/len(lp_iter)
     # code chunk to return
     map_estimates = global_guide(data)
-    if 'gr' in mtype:
-        membership = get_membership(model, global_guide, data, temperature = 0)
-        return seed, map_estimates, membership, logprob_estimate
-    elif 'dim' in mtype:
-        return seed, map_estimates, logprob_estimate
-
+    if return_guide:
+        guidecopy = deepcopy(global_guide)
+        if 'gr' in mtype:
+            membership = get_membership(model, global_guide, data, temperature = 0)
+            return seed, map_estimates, membership, logprob_estimate, guidecopy
+        elif 'dim' in mtype:
+            return seed, map_estimates, logprob_estimate, guidecopy
+    else:
+        if 'gr' in mtype:
+            membership = get_membership(model, global_guide, data, temperature = 0)
+            return seed, map_estimates, membership, logprob_estimate
+        elif 'dim' in mtype:
+            return seed, map_estimates, logprob_estimate
+            
 def print_svi_param(map_estimates):
     for i in map_estimates.keys():
         prm = map_estimates[i]
