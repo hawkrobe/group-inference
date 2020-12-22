@@ -27,7 +27,7 @@ class TransitionModel():
     automatically determines which model to use based on init params
     '''
     def __init__(self, data, K, target, dtype, auto, mtype, stickbreak = False):
-        self.K = 3
+        self.K = K
         self.mtype = mtype # 'grp','dim'
         self.target = target # 'self','targ','avg'
         self.dtype = dtype # 'norm','raw'
@@ -182,7 +182,7 @@ class TransitionModel():
 
         inferred_model = infer_discrete(trained_model, temperature=temperature,
                                         first_available_dim=-2)  # avoid conflict with data plate
-        trace = poutine.trace(inferred_model).get_trace(self.data)
+        trace = poutine.trace(inferred_model).get_trace() # no longer passing data explicitly
         return trace.nodes["assignment"]["value"]
 
     def fit(self, print_fit = True, return_guide = False):
@@ -222,20 +222,50 @@ class TransitionModel():
             lp_iter.append(model_trace.log_prob_sum() - guide_trace.log_prob_sum())
         self.logprob_estimate = sum(lp_iter)/len(lp_iter)
         # code chunk to return
-        map_estimates = self.guide(self.data)
+        self.map_estimates = self.guide(self.data)
         if return_guide:
             guidecopy = deepcopy(self.guide)
-            if 'grp' in mtype:
+            if 'grp' in self.mtype:
                 self.membership = self.get_membership(temperature = 0)
                 return self.seed, self.map_estimates, self.membership, self.logprob_estimate, self.guidecopy
-            elif 'dim' in mtype:
+            elif 'dim' in self.mtype:
                 return self.seed, self.map_estimates, self.logprob_estimate, self.guidecopy
         else:
-            if 'gr' in mtype:
+            if 'gr' in self.mtype:
                 self.membership = self.get_membership(temperature = 0)
                 return self.seed, self.map_estimates, self.membership, self.logprob_estimate
-            elif 'dim' in mtype:
+            elif 'dim' in self.mtype:
                 return self.seed, self.map_estimates, self.logprob_estimate
+
+    def fit_mcmc(self, nsample = 5000, burnin = 1000, seed = 0):
+        '''
+        to be improved
+        '''
+        pyro.clear_param_store()
+        if hasattr(self, 'seed'):
+            pyro.set_rng_seed(self.seed)
+        else:
+            pyro.set_rng_seed(seed)
+        nuts_kernel = NUTS(self.model)
+        mcmc = MCMC(nuts_kernel, num_samples=nsample, warmup_steps=burnin)
+        mcmc.run(self.data)
+
+        posterior_samples = mcmc.get_samples()
+        return posterior_samples
+
+class StimuliSelector():
+    '''
+    1. given sparse data and fitted params (currently from k=3 model),
+        classify(hard/soft assignmet to group)/ infer dimension values (dimension)
+    2. sparse data consists of nfeature (cuurently 1 or 3), all possible values on each feature
+    3. (group) once generated, use the sparse classification to construct distributions/expected values for unobserved features
+    4. (dimension) tbd
+    '''
+    def __init__(self):
+        pass
+
+    def analyze(self):
+        pass
 
 if __name__ == '__main__':
     # import pickled data
@@ -246,12 +276,13 @@ if __name__ == '__main__':
         tavg_norm_all_3d, tavg_norm_noauto_3d, tavg_raw_all_3d, tavg_raw_noauto_3d] = pickle.load(f)
 
     tomtom = TransitionModel(
-        data = tself_raw_noauto_3d,
-        K = 3,
+        data = tself_norm_all_3d,
+        K = 2,
         target = 'self',
-        dtype = 'raw',
-        auto = 'noauto',
-        mtype = 'grp'
+        dtype = 'norm',
+        auto = 'all',
+        mtype = 'dim'
     )
 
     tomtom.fit()
+    print(tomtom)
