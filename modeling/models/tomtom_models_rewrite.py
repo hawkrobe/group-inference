@@ -240,7 +240,7 @@ class TransitionModel():
 if __name__ == '__main__':
     # import pickled data
     import pickle
-    with open('C:/Users/zhaoz/group-inference/data/tomtom_data_preprocessed.pkl','rb') as f:
+    with open('../data/tomtom_data_preprocessed.pkl','rb') as f:
         [tself_norm_all_3d, tself_norm_noauto_3d, tself_raw_all_3d, tself_raw_noauto_3d,
         ttarg_norm_all_3d, ttarg_norm_noauto_3d, ttarg_raw_all_3d, ttarg_raw_noauto_3d,
         tavg_norm_all_3d, tavg_norm_noauto_3d, tavg_raw_all_3d, tavg_raw_noauto_3d] = pickle.load(f)
