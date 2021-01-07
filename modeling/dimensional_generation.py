@@ -67,23 +67,24 @@ def model_multi_obs_dim(obsmat):
     num_topics = tm.K
     nparticipants = data.shape[0]
     nfeatures = data.shape[1] # number of rows in each person's matrix
-    ncol = data.shape[2]            
+    ncol = data.shape[2]
+
+    # This is a reasonable prior for dirichlet concentrations
+    gamma_prior = dist.Gamma(
+        2 * torch.ones(nfeatures, ncol),
+        1/3 * torch.ones(nfeatures, ncol)
+    ).to_event(2)
+
     with pyro.plate('topic', num_topics):
         # sample a weight and value for each topic
         topic_weights = pyro.sample("topic_weights", dist.Gamma(1. / num_topics, 1.))
-        topic_a = pyro.sample(
-            "topic_a",
-            dist.Gamma(2 * torch.ones(nfeatures, ncol),
-                       1/3 * torch.ones(nfeatures, ncol)).to_event(2)
-        )
-        topic_b = pyro.sample(
-            "topic_b",
-            dist.Gamma(2 * torch.ones(nfeatures, ncol),
-                       1/3 * torch.ones(nfeatures, ncol)).to_event(2)
-        )
+        topic_a = pyro.sample("topic_a", gamma_prior)
+        topic_b = pyro.sample("topic_b", gamma_prior)
         
-    # sample each participant's idiosyncratic topic mixture
+    # sample new participant's idiosyncratic topic mixture
     participant_topics = pyro.sample("new_participant_topic", dist.Dirichlet(topic_weights))
+
+    # we parallelize over the possible topics and pyro automatically weights them by their probs
     transition_topics = pyro.sample("new_transition_topic", dist.Categorical(participant_topics),
                                     infer={"enumerate": "parallel"})
     rowind = obsmat[1].type(torch.long)
@@ -94,36 +95,33 @@ def model_multi_obs_dim(obsmat):
           
 @config_enumerate
 def new_guide(obsmat):
-    # Global variables.
+    # These are just the previous values we can use to initialize params here
     initial_topic_weights = pyro.get_param_store()['AutoDelta.topic_weights']
     initial_alpha = pyro.get_param_store()['AutoDelta.topic_weights']
     initial_topic_a = pyro.get_param_store()['AutoDelta.topic_a']
     initial_topic_b = pyro.get_param_store()['AutoDelta.topic_b']
-    with poutine.block(hide_types=["param"]):  # Keep our learned values of global parameters.
+
+    # Use poutine.block to Keep our learned values of global parameters.
+    with poutine.block(hide_types=["param"]):
+
+        # This has to match the structure of the model
         with pyro.plate('topic', tm.K):
-            pyro.sample("topic_weights", dist.Delta(
-                pyro.param('AutoDelta.topic_weights', initial_topic_weights)
-            ))
+            # We manually define the AutoDelta params we had from before here
+            topic_weights_q = pyro.param('AutoDelta.topic_weights', initial_topic_weights)
+            topic_a_q = pyro.param('AutoDelta.topic_a', initial_topic_a)
+            topic_b_q = pyro.param('AutoDelta.topic_b', initial_topic_b)
 
-            topic_a = pyro.sample('topic_a', dist.Delta(
-                pyro.param('AutoDelta.topic_a', initial_topic_a)
-            ).to_event(2))
+            # Each of the sample statements in the above model needs to have a corresponding
+            # statement here where we insert our tuneable params
+            pyro.sample("topic_weights", dist.Delta(topic_weights_q))
+            pyro.sample('topic_a', dist.Delta(topic_a_q).to_event(2))
+            pyro.sample('topic_b', dist.Delta(topic_b_q).to_event(2))
 
-            topic_b = pyro.sample('topic_b', dist.Delta(
-                pyro.param('AutoDelta.topic_b', initial_topic_b)
-            ).to_event(2))
-
+    # We define a new learnable parameter for the new participant that
+    # sums to 1 (via constraint) and plug this in as their topic probabilities
     probs = pyro.param('new_participant_topic_q', initial_alpha, constraint=constraints.simplex)
     participant_topics = pyro.sample("new_participant_topic", dist.Delta(probs).to_event(1))
-    # transition_topics = pyro.sample("new_transition_topic", dist.Categorical(participant_topics),
-    #                                 infer={"enumerate": "parallel"})
-    # rowind = obsmat[1].type(torch.long)
-    # colind = obsmat[2].type(torch.long)
-    # d = dist.Beta(topic_a[transition_topics, rowind, colind],
-    #               topic_b[transition_topics, rowind, colind]).to_event(2)
-    # pyro.sample('obs', d, obs = obsmat[0])
 
-# new_guide = AutoDelta(poutine.block(model_multi_obs_dim, expose = ['new_participant_topic']))
 def initialize_multi_obs_dim(seed, model, guide, data):
     global svi
     pyro.set_rng_seed(seed)
@@ -143,15 +141,16 @@ print('here')
 for row in np.arange(data.shape[1]):
     for col in np.arange(data.shape[2]):
         step_count = 0
-        print('({},{})'.format(row,col))
         for step in np.arange(.1, 1,.1):
-            newdata = torch.tensor([step, row, col]).float() 
+            print('(row: {}, col: {}, datum: {})'.format(row, col, step))
+            newdata = torch.tensor([step, row, col]).float()
+
+            # Find a reasonable initialization over 100 attempts
             loss, seed = min((initialize_multi_obs_dim(seed,model_multi_obs_dim,new_guide,newdata),
                               seed) for seed in range(100))
             initialize_multi_obs_dim(seed,model_multi_obs_dim,new_guide,newdata)
             stor_dim_seed[row, col, step_count] = seed
             stor_dim_init_loss[row,col,step_count] = loss
-            print(newdata)
             for i in range(2500):
                 loss = svi.step(newdata)
                 if i % 1000 == 0 :
