@@ -198,7 +198,7 @@ def tomtom_svi(data, print_fit = True, return_guide = False):
             return seed, map_estimates, membership, logprob_estimate
         elif 'dim' in mtype:
             return seed, map_estimates, logprob_estimate
-            
+
 def print_svi_param(map_estimates):
     for i in map_estimates.keys():
         prm = map_estimates[i]

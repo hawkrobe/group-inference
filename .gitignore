@@ -3,3 +3,4 @@
 *.html
 *__pycache__*
 data/generated/grp*.pkl
+data/generated/stor*.pkl

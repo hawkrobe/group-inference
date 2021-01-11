@@ -261,28 +261,152 @@ class StimuliSelector():
     3. (group) once generated, use the sparse classification to construct distributions/expected values for unobserved features
     4. (dimension) tbd
     '''
-    def __init__(self):
+    def __init__(self, fitted = None):
+        # option to construct StimuliSelector from fitted TransitionModel objects
+        if fitted:
+            self = fitted
+            self.constructed_from_fitted = True
+        else:
+            self.constructed_from_fitted = False
+
+    def hard_grp_infer_unobserved(self, map_est = None):
+        '''
+        Under hard assignment, there are only K possible predictions for each transition
+        return K matrices of expected values and (optionally) K matrices of distribution objs
+        '''
         pass
 
-    def analyze(self):
+    def soft_grp_raw_infer_unobserved(self, stor, map_est = None):
+        '''
+        Under soft assignment
+        1. for each feature-value combo extract the assgn proba
+        2. use proba to make mixture model
+        3. each feature-value combo will have a matrix of expected value and (opt) a matrix of distributions
+        might have memory problems
+        stor: stored [feature (set) - feature value - assignment proba], must be nd dimensions where nd = 1 + nfeature +1
+        dim 0 indexes feature sets, each of the nfeature dims encode values within a feature, and last dimension is K assignment probas
+        '''
+        # handle when MAP is not available
+        if not self.constructed_from_fitted and not map_est:
+            raise AttributeError('StimuliSelector must be constructed from a TransitionModel, or MAP estimates must be passed')
+        elif self.constructed_from_fitted:
+            map_est = self.map_estimates
+        # body
+        # construct iterator to loop through the first nd-1 dimensions
+        last_dim = len(stor.shape)-1
+        stor_short = stor.sum(axis = last_dim) # shaving off the last dimension
+        it_stor =  np.ndenumerate(stor_short)
+        # empty array to store the mixture objects
+        mix_dists = np.empty(stor_short.shape, dtype=object)
+        mix_means = np.empty(stor_short.shape, dtype=object)
+        # extract alpha & beta from MAP, should already have the right dimensionality (K*15*4)
+        all_a = map_est['alpha']
+        all_b = map_est['beta']
+        # construct the component distributions (betas)
+        all_dist = dist.Beta(all_a, all_b).to_event(len(all_a.shape)-1)
+        # loop through and generate distribution objects
+        for fc in it_stor:
+            inds = fc[0]
+            print(inds)
+            ass_proba = dist.Categorical(stor[inds])
+            mix = torch.distributions.mixture_same_family.MixtureSameFamily(ass_proba,all_dist)
+            mix_dists[inds] = mix
+            mix_means[inds] = mix.mean
+        return mix_dists, mix_means
+
+    def infer_unobserved_dim(self):
         pass
 
 if __name__ == '__main__':
     # import pickled data
     import pickle
-    with open('C:/Users/zhaoz/group-inference/data/tomtom_data_preprocessed.pkl','rb') as f:
-        [tself_norm_all_3d, tself_norm_noauto_3d, tself_raw_all_3d, tself_raw_noauto_3d,
-        ttarg_norm_all_3d, ttarg_norm_noauto_3d, ttarg_raw_all_3d, ttarg_raw_noauto_3d,
-        tavg_norm_all_3d, tavg_norm_noauto_3d, tavg_raw_all_3d, tavg_raw_noauto_3d] = pickle.load(f)
+    import time
+    import sys
+    # with open('C:/Users/zhaoz/group-inference/data/tomtom_data_preprocessed.pkl','rb') as f:
+    #     [tself_norm_all_3d, tself_norm_noauto_3d, tself_raw_all_3d, tself_raw_noauto_3d,
+    #     ttarg_norm_all_3d, ttarg_norm_noauto_3d, ttarg_raw_all_3d, ttarg_raw_noauto_3d,
+    #     tavg_norm_all_3d, tavg_norm_noauto_3d, tavg_raw_all_3d, tavg_raw_noauto_3d] = pickle.load(f)
 
-    tomtom = TransitionModel(
-        data = tself_norm_all_3d,
-        K = 2,
-        target = 'self',
-        dtype = 'norm',
-        auto = 'all',
-        mtype = 'dim'
-    )
+    # tomtom = TransitionModel(
+    #     data = tself_norm_all_3d,
+    #     K = 2,
+    #     target = 'self',
+    #     dtype = 'norm',
+    #     auto = 'all',
+    #     mtype = 'dim'
+    # )
+    #
+    # tomtom.fit()
 
-    tomtom.fit()
-    print(tomtom)
+    # # testing how np.ndenumerate works
+    # with open('C:/Users/zhaoz/group-inference/data/generated/stor_grp_1feat.pkl','rb') as f:
+    #     [hard1, soft1] = pickle.load(f)
+    with open('C:/Users/zhaoz/group-inference/data/generated/stor_grp_3feat.pkl','rb') as f:
+        [hard3, soft3] = pickle.load(f)
+    # a = np.ndenumerate(soft3)
+    # b = np.ndenumerate(soft3.sum(axis=len(soft3.shape)-1))
+    # for i in range(5):
+    #     nde = next(b)
+    #     ndei = nde[0]
+    #     print(soft3[ndei])
+
+    # # testing how MixtureSameFamily work with torch.distributions shapes
+    # da = dist.Beta(torch.tensor([[1,1],[1,1]]),torch.tensor([[.2,.3],[.4,.5]]))
+    # db = dist.Beta(torch.tensor([5,5,5,5]),torch.tensor([.2,.3,.4,.5]))
+    # print(f'batch size {da.batch_shape}')
+    # print(f'event size {da.event_shape}')
+    # mix_alt = dist.Categorical(torch.tensor([1,2,3,4]))
+    # mix_alt2 = dist.Categorical(torch.tensor([1,2]))
+    # dc = torch.distributions.mixture_same_family.MixtureSameFamily(mix_alt2, da.to_event(1))
+    # tik = time.time()
+    # print(sys.getsizeof(dc))
+    # print(dc.sample(torch.Size([1])))
+    # print(dc.mean)
+    #
+    # print(time.time() - tik)
+    #
+    # dtest = dist.Beta(torch.tensor([[1,2,3],[4,5,6]]), torch.tensor([[.1,.1,.1],[.1,.1,.1]]))
+    # print(dtest.to_event(1).batch_shape, dtest.to_event(1).event_shape)
+    # print(type(dtest.to_event(1)))
+    # mixtest = dist.Categorical(torch.tensor([1,1]))
+    # d = torch.distributions.mixture_same_family.MixtureSameFamily(mixtest, dtest.to_event(1))
+    # print(d.batch_shape, d.event_shape)
+    # d.sample(torch.tensor([1]))
+    # print(d.mean)
+
+    # # testing how tensor.permute works
+    # a = torch.tensor([[[1,2],[3,4]],[[5,6],[7,8]],[[9,10],[11,12]]])
+    # b = a.permute(2,0,1)
+    # print(a[0])
+    # print(b[:,0,:])
+
+    with open('C:/Users/zhaoz/group-inference/data/generated/tomtom_fitted_models.pkl','rb') as f:
+        [seeds_self_norm_all_grp,maps_self_norm_all_grp,logprobs_self_norm_all_grp,mems_self_norm_all_grp,
+         seeds_self_norm_all_dim,maps_self_norm_all_dim,logprobs_self_norm_all_dim,
+         seeds_self_norm_noauto_grp,maps_self_norm_noauto_grp,logprobs_self_norm_noauto_grp,mems_self_norm_noauto_grp,
+         seeds_self_norm_noauto_dim,maps_self_norm_noauto_dim,logprobs_self_norm_noauto_dim,
+         seeds_self_raw_all_grp,maps_self_raw_all_grp,logprobs_self_raw_all_grp,mems_self_raw_all_grp,
+         seeds_self_raw_all_dim,maps_self_raw_all_dim,logprobs_self_raw_all_dim,
+         seeds_self_raw_noauto_grp,maps_self_raw_noauto_grp,logprobs_self_raw_noauto_grp,mems_self_raw_noauto_grp,
+         seeds_self_raw_noauto_dim,maps_self_raw_noauto_dim,logprobs_self_raw_noauto_dim] = pickle.load(f)
+
+    tik = time.time()
+    # # print(maps_self_raw_noauto_grp[2]['alpha'].shape)
+    # a = maps_self_raw_noauto_grp[2]['alpha']
+    # b = maps_self_raw_noauto_grp[2]['beta']
+    # all_dist = dist.Beta(a,b)
+    # all_dist = all_dist.to_event(2)
+    # print(all_dist.batch_shape, all_dist.event_shape)
+    # mix = dist.Categorical(torch.tensor([1,1,1]))
+    #
+    # c = torch.distributions.mixture_same_family.MixtureSameFamily(mix,all_dist)
+    #
+    # print(c.sample(torch.Size([5])))
+    # print(c.sample(torch.Size([5])).shape)
+    # print(c.mean)
+    # print(time.time()-tik)
+    # jk = np.array([[c,c],[a,b]])
+    # print(jk.dtype)
+
+    StimuliSelector().soft_grp_raw_infer_unobserved(soft3, maps_self_raw_noauto_grp[2])
+    print(time.time() - tik)
