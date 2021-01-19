@@ -269,12 +269,36 @@ class StimuliSelector():
         else:
             self.constructed_from_fitted = False
 
-    def hard_grp_infer_unobserved(self, map_est = None):
+    def hard_grp_raw_infer_unobserved(self, stor, map_est = None):
         '''
         Under hard assignment, there are only K possible predictions for each transition
         return K matrices of expected values and (optionally) K matrices of distribution objs
         '''
-        pass
+        # handle when MAP is not available
+        if not self.constructed_from_fitted and not map_est:
+            raise AttributeError('StimuliSelector must be constructed from a TransitionModel, or MAP estimates must be passed')
+        elif self.constructed_from_fitted:
+            map_est = self.map_estimates
+        # under hard assignment, getting dist and mean is simply indexing
+        # construct iterator to loop through
+        it_stor =  np.ndenumerate(stor)
+        # empty array to store the mixture objects
+        dists = np.empty(stor.shape, dtype=object)
+        means = np.empty(stor.shape, dtype=object)
+        # extract alpha & beta from MAP, should already have the right dimensionality (K*15*4)
+        all_a = map_est['alpha']
+        all_b = map_est['beta']
+        all_dist = []
+        for i in range(all_a.shape[0]):
+            all_dist.append(dist.Beta(all_a[i],all_b[i]))
+        all_mean = [d.mean for d in all_dist]
+        for fc in it_stor:
+            ind = fc[0]
+            # print(ind)
+            grp = int(fc[1])
+            dists[ind] = all_dist[grp]
+            means[ind] = all_mean[grp]
+        return dists, means
 
     def soft_grp_raw_infer_unobserved(self, stor, map_est = None):
         '''
@@ -307,15 +331,42 @@ class StimuliSelector():
         # loop through and generate distribution objects
         for fc in it_stor:
             inds = fc[0]
-            print(inds)
+            # print(inds)
             ass_proba = dist.Categorical(stor[inds])
             mix = torch.distributions.mixture_same_family.MixtureSameFamily(ass_proba,all_dist)
             mix_dists[inds] = mix
             mix_means[inds] = mix.mean
         return mix_dists, mix_means
 
-    def infer_unobserved_dim(self):
-        pass
+    def dim_raw_infer_unobserved(self, stor, map_est = None):
+        # handle when MAP is not available
+        if not self.constructed_from_fitted and not map_est:
+            raise AttributeError('StimuliSelector must be constructed from a TransitionModel, or MAP estimates must be passed')
+        elif self.constructed_from_fitted:
+            map_est = self.map_estimates
+        # basically the same code as soft_grp, think about how to remove redundancy
+        # construct iterator to loop through the first nd-1 dimensions
+        last_dim = len(stor.shape)-1
+        stor_short = stor.sum(axis = last_dim) # shaving off the last dimension
+        it_stor =  np.ndenumerate(stor_short.detach().numpy())
+        # empty array to store the mixture objects
+        mix_dists = np.empty(stor_short.shape, dtype=object)
+        mix_means = np.empty(stor_short.shape, dtype=object)
+        # extract relevant MAP map_estimates
+        # extract alpha & beta from MAP, should already have the right dimensionality (K*15*4)
+        all_a = map_est['topic_a']
+        all_b = map_est['topic_b']
+        # construct the component distributions (betas)
+        all_dist = dist.Beta(all_a, all_b).to_event(len(all_a.shape)-1)
+        # loop through and generate distribution objects
+        for fc in it_stor:
+            inds = fc[0]
+            # print(inds)
+            ass_proba = dist.Categorical(stor[inds])
+            mix = torch.distributions.mixture_same_family.MixtureSameFamily(ass_proba,all_dist)
+            mix_dists[inds] = mix
+            mix_means[inds] = mix.mean
+        return mix_dists, mix_means
 
 if __name__ == '__main__':
     # import pickled data
@@ -339,8 +390,8 @@ if __name__ == '__main__':
     # tomtom.fit()
 
     # # testing how np.ndenumerate works
-    # with open('C:/Users/zhaoz/group-inference/data/generated/stor_grp_1feat.pkl','rb') as f:
-    #     [hard1, soft1] = pickle.load(f)
+    with open('C:/Users/zhaoz/group-inference/data/generated/stor_grp_1feat.pkl','rb') as f:
+        [hard1, soft1] = pickle.load(f)
     with open('C:/Users/zhaoz/group-inference/data/generated/stor_grp_3feat.pkl','rb') as f:
         [hard3, soft3] = pickle.load(f)
     # a = np.ndenumerate(soft3)
@@ -408,5 +459,34 @@ if __name__ == '__main__':
     # jk = np.array([[c,c],[a,b]])
     # print(jk.dtype)
 
-    StimuliSelector().soft_grp_raw_infer_unobserved(soft3, maps_self_raw_noauto_grp[2])
-    print(time.time() - tik)
+    stimselect = StimuliSelector()
+
+    [h1dists,h1means] = stimselect.hard_grp_raw_infer_unobserved(hard1,maps_self_raw_noauto_grp[2])
+    print(h1means[0])
+    print(h1means.shape)
+    [s1dists,s1means] = stimselect.soft_grp_raw_infer_unobserved(soft1, maps_self_raw_noauto_grp[2])
+    tok = time.time()
+    print(tok - tik)
+    # save inferred
+    with open('tomtom_sparse_inference_grp_1feat.pkl','wb') as f:
+        pickle.dump([h1dists,h1means,s1dists,s1means],f)
+
+
+    [h3dists,h3means] = stimselect.hard_grp_raw_infer_unobserved(hard3,maps_self_raw_noauto_grp[2])
+    print(h3means[0])
+    print(h3means.shape)
+    [s3dists,s3means] = stimselect.soft_grp_raw_infer_unobserved(soft3, maps_self_raw_noauto_grp[2])
+    tok = time.time()
+    print(tok - tik)
+    # save inferred
+    # with open('tomtom_sparse_inference_grp_3feat.pkl','wb') as f:
+    #     pickle.dump([h3dists,h3means,s3dists,s3means],f)
+    import joblib
+    joblib.dump([h3dists,h3means,s3dists,s3means],'tomtom_sparse_inference_grp_3feat.z') # ended up running on cluster, needed 1000G mem to save
+
+
+
+
+
+
+    print(time.time() - tok)
