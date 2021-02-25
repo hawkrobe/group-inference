@@ -2,6 +2,4 @@
 *~
 *.html
 *__pycache__*
-data/generated/grp*.pkl
 data/generated/stor*.pkl
-modeling/draft_misc

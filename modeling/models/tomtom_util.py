@@ -27,7 +27,7 @@ import torch.nn.functional as F
 from itertools import combinations
 
 # some variable shared by several utility functions
-states = pd.read_csv('../data/states.csv') # there's probably a better place to put this
+states = pd.read_csv('C:/Users/zhaoz/group-inference/data/states.csv') # there's probably a better place to put this
 states['statepair'] = states['state1'] + '_' + states['state2']# construct state pair strings
 states.head()
 

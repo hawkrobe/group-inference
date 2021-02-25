@@ -63,7 +63,7 @@ class TransitionModel():
                 beta_mix = pyro.sample("weights", dist.Beta(1, 10))
             weights = self.mix_weights(beta_mix)
         else:
-            weights = pyro.sample('weights', dist.Dirichlet(0.5 * torch.ones(K)))
+            weights = pyro.sample('weights', dist.Dirichlet(0.5 * torch.ones(self.K)))
         # model parameters
         with pyro.plate('components', self.K):
             # concentration parameters

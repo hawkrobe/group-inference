@@ -39,11 +39,12 @@ import models.tomtom_util as tu
 import warnings
 warnings.filterwarnings("ignore")
 
-with open('../data/tomtom_data_preprocessed.pkl','rb') as f:
+# with open('../data/tomtom_data_preprocessed.pkl','rb') as f:
+with open('C:/Users/zhaoz/group-inference/data/tomtom_data_preprocessed.pkl','rb') as f:
     [tself_norm_all_3d, tself_norm_noauto_3d, tself_raw_all_3d, tself_raw_noauto_3d,
     ttarg_norm_all_3d, ttarg_norm_noauto_3d, ttarg_raw_all_3d, ttarg_raw_noauto_3d,
     tavg_norm_all_3d, tavg_norm_noauto_3d, tavg_raw_all_3d, tavg_raw_noauto_3d] = pickle.load(f)
-    
+
 tm.K = 3
 tm.mtype = 'dim'
 tm.target = 'self' # 'self','targ','avg'
@@ -80,7 +81,7 @@ def model_multi_obs_dim(obsmat):
         topic_weights = pyro.sample("topic_weights", dist.Gamma(1. / num_topics, 1.))
         topic_a = pyro.sample("topic_a", gamma_prior)
         topic_b = pyro.sample("topic_b", gamma_prior)
-        
+
     # sample new participant's idiosyncratic topic mixture
     participant_topics = pyro.sample("new_participant_topic", dist.Dirichlet(topic_weights))
 
@@ -92,7 +93,7 @@ def model_multi_obs_dim(obsmat):
     d = dist.Beta(topic_a[transition_topics, rowind, colind],
                   topic_b[transition_topics, rowind, colind])
     pyro.sample('obs', d, obs = obsmat[0])
-          
+
 @config_enumerate
 def new_guide(obsmat):
     # These are just the previous values we can use to initialize params here
@@ -161,5 +162,5 @@ for row in np.arange(data.shape[1]):
             stor_dim_prb[row,col,step_count,:] = pyro.get_param_store()['new_participant_topic_q']
             step_count += 1
 
-with open('tomtom_sparse_dim_param.pkl','wb') as f:
-    pickle.dump([stor_dim_seed, stor_dim_init_loss, stor_dim_final_loss, stor_dim_prb],f)
+# with open('tomtom_sparse_dim_param.pkl','wb') as f:
+#     pickle.dump([stor_dim_seed, stor_dim_init_loss, stor_dim_final_loss, stor_dim_prb],f)
