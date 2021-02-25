@@ -1,0 +1,6 @@
+#!/bin/bash
+for segind in {0..2499}
+# for segind in {0..4}
+do
+sbatch sbatch_dim_3feat_spreadout $segind
+done
