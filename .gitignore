@@ -5,3 +5,6 @@
 data/generated/grp*.pkl
 data/generated/stor*.pkl
 modeling/draft_misc
+
+analysis/behavior_pilot1_mdlvbsln/*
+!analysis/behavior_pilot1_mdlvbsln/tomtom_pilot1_analyses.R
