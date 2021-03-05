@@ -1,0 +1,15 @@
+#!/bin/bash
+for segind in {1..10}
+# for segind in {0..4}
+  do
+    # sbatch sbatch_kfold_parallel_grp $segind
+
+    for splitid in {1..5}
+
+      do
+
+        sbatch sbatch_kfold_parallel_dim $segind $splitid
+
+      done
+
+  done
