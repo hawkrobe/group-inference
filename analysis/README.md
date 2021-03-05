@@ -1,6 +1,3 @@
 # group-inference/analysis
 
-* *data*: Raw datasets and output of experiments
-* *analysis*: Scripts/notebooks for behavioral analyses
-* *modeling*: Scripts/notebooks for simulations
-* *experiments*: Code & materials for our behavioral experiments
+* *behavior_pilot_mdlvbsln*: R script for pilot 1 behavior analyses
