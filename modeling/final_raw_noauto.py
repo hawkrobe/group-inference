@@ -61,22 +61,24 @@ if __name__ == '__main__':
 
     # make sparse inferences
     hdist, hmeans, sdist, smeans = sparse_grp.group_infer(mdl_grp)
-    ddist, dmeans = mdl_multi_obs.dimension_infer(mdl_dim)
+    ddist, dmeans = sparse_dim.dimension_infer(mdl_dim)
 
     # massage objects tobe r-friendly
-    def torch2np(mat):
-        enu = np.ndenumerate(mat)
-        for i in enu:
-            ind = i[0]
-            val = i[1]
-            mat[ind] = val.detach().numpy()
-    hmeans = torch2np(hmeans)
-    smeans = torch2np(smenas)
-    dmeans = torch2np(dmeans)
+    # def torch2np(mat):
+    #     enu = np.ndenumerate(mat)
+    #     for i in enu:
+    #         ind = i[0]
+    #         val = i[1]
+    #         mat[ind] = val.detach().numpy()
+    # hmeans = torch2np(hmeans)
+    # smeans = torch2np(smeans)
+    # dmeans = torch2np(dmeans)
     # other relevant objects for saving
     stor_grp = getattr(sparse_grp,'stor_grp')
     stor_grp_prb = getattr(sparse_grp,'stor_grp_prb')
     stor_dim_prb = getattr(sparse_dim,'stor_dim_prb')
+    grp_map = getattr(mdl_grp,'map_estimates')
+    dim_map = getattr(mdl_dim,'map_estimates')
     # save all relevant files for visualization
     with open('tomtom_final_raw_noauto_data4viz.pkl','wb') as f:
-        pickle.dump([hmeans,smeans,dmeans,stor_grp,stor_grp_prb,stor_dim_prb],f)
+        pickle.dump([hmeans,smeans,dmeans,stor_grp,stor_grp_prb,stor_dim_prb,grp_map,dim_map],f)
