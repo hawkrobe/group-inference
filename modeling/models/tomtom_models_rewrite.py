@@ -34,7 +34,7 @@ class TransitionModel():
     contains all models crossing mtype, dtype, and auto
     automatically determines which model to use based on init params
     '''
-    def __init__(self, data, K, target, dtype, auto, mtype, stickbreak = False):
+    def __init__(self, data, K, target, dtype, auto, mtype, stickbreak = False, sparse_nstep = 2000):
         self.K = K
         self.mtype = mtype # 'grp','dim'
         self.target = target # 'self','targ','avg'
@@ -57,6 +57,8 @@ class TransitionModel():
         # optimizers
         self.optim = pyro.optim.Adam({'lr': 0.0005, 'betas': [0.8, 0.99]})
         self.elbo = TraceEnum_ELBO(max_plate_nesting=1)
+
+        self.sparse_nstep = sparse_nstep
 
     def mix_weights(self, beta):
         beta1m_cumprod = (1 - beta).cumprod(-1)
@@ -633,12 +635,38 @@ class SparseModel(TransitionModel):
                                       seed) for seed in range(100))
                     self.initialize_multi_obs_dim(seed,obsmat)
                     tik = time.time()
-                    for s in range(2000):
-                        if s % 1000 == 0:
-                            print(s//1000)
+                    for s in range(self.sparse_nstep):
+                        # if s % 1000 == 0:
+                        #     print(s//1000)
                         loss = self.svi.step(obsmat)
                     print('time! {}'.format(time.time() - tik))
                     stor_dim_prb[i,j,k,:] = pyro.get_param_store()['new_participant_topic_q']
+        self.stor_dim_prb = stor_dim_prb
+        return self.stor_dim_prb
+
+    def dimension_learn_subset(self,fitted_model,test_data, stim_size = 700):
+        # reproducibility is currently not achieved (want randomness)
+        self.fitted_model = fitted_model
+        stor_dim_prb = torch.empty(size = [test_data.shape[0],test_data.shape[1],test_data.shape[2],self.K])
+        enu = np.ndenumerate(torch.empty(size = [test_data.shape[0],test_data.shape[1],test_data.shape[2]]))
+        enu = [i[0] for i in enu]
+        inds = random.sample(enu, stim_size)
+        self.stim_subset = inds
+        for ind in inds:
+            print('onto {}'.format(ind))
+            [i,j,k] = [ind[0], ind[1], ind[2]]
+            # print('dimension learning, onto p{} r{} c{}'.format(i,j,k))
+            obsmat = torch.tensor([test_data[i,j,k],j,k]).float().unsqueeze(0)
+            loss, seed = min((self.initialize_multi_obs_dim(seed,obsmat),
+                              seed) for seed in range(100))
+            self.initialize_multi_obs_dim(seed,obsmat)
+            tik = time.time()
+            for s in range(self.sparse_nstep):
+                # if s % 1000 == 0:
+                #     print(s//1000)
+                loss = self.svi.step(obsmat)
+            print('time! {}'.format(time.time() - tik))
+            stor_dim_prb[i,j,k,:] = pyro.get_param_store()['new_participant_topic_q']
         self.stor_dim_prb = stor_dim_prb
         return self.stor_dim_prb
 
@@ -787,7 +815,7 @@ class ModelEvaluator():
 
 class ParallelEvaluator():
     #### two levels of parallelization: the outer level done by submitting multiple slurm jobs
-    def __init__(self, data, target, dtype, auto, mtype, maxk, K, nfold = 5, random_state = None):
+    def __init__(self, data, target, dtype, auto, mtype, maxk, K, nfold = 5, random_state = None, sparse_nstep = 10000):
         self.data = data
         self.maxk = maxk
         self.K = K
@@ -806,6 +834,8 @@ class ParallelEvaluator():
         kf = KFold(n_splits = self.nfold, shuffle = True, random_state = self.random_seeds[self.rseed_counter])
         self.rseed_counter += 1;
         self.split = kf.split(list(range(self.data.shape[0])))
+
+        self.sparse_nstep = sparse_nstep
 
     def evaluate_singleK(self, split, split_id, queue): # multiprocessing.Queue arg to store output
         print('doing a split')
@@ -907,6 +937,52 @@ class ParallelEvaluator():
                 self.h_ae, self.s_ae, self.h_se, self.s_se, self.h_lp, self.s_lp = mdl_multi_obs.group_compute_metrics(test)
                 grp_out.append((self.h_ae, self.s_ae, self.h_se, self.s_se, self.h_lp, self.s_lp))
         return grp_out
+
+    def evaluate_parallel_alt_subset(self,split_id = None, stim_size = 700):
+        if split_id:
+            splits = (list(self.split)[split_id-1],) # exogenously make sure split ids and nfold match up. split id 1 index
+            print('MANUAL PARALLEL just doing one split')
+        else:
+            splits = list(self.split)
+            grp_out = []
+
+        for splt in splits:
+            train_index = splt[0]
+            test_index = splt[1]
+            print('doing a split')
+            seed = self.random_seeds[self.K]
+            if split_id:
+                seed += split_id
+            random.seed(seed) # means that for dim
+
+            train = self.data[train_index,:,:]
+            test = self.data[test_index,:,:]
+            k = self.K
+            # first fit the model
+            mdl = TransitionModel(
+                train, k, self.target, self.dtype, self.auto, self.mtype, stickbreak = False
+            )
+            mdl.fit()
+
+            mdl_multi_obs = SparseModel(
+                train, k, self.target, self.dtype, self.auto, self.mtype, stickbreak = False, sparse_nstep = self.sparse_nstep
+            )
+
+            if 'dim' in self.mtype:
+                # mdl_multi_obs.dimension_learn_parallel(mdl,test) # doesn't work for dimensional because of autograd threading
+                mdl_multi_obs.dimension_learn_subset(mdl,test,stim_size = stim_size)
+                ddist, dmeans = mdl_multi_obs.dimension_infer(mdl)
+                self.d_ae, self.d_se, self.d_lp = mdl_multi_obs.dimension_compute_metrics(test)
+                stim_subset = getattr(mdl_multi_obs,'stim_subset')# document the actually selected stims to index the prediction matrices
+                return (split_id, self.d_ae, self.d_se, self.d_lp, stim_subset) # note that dim must be run with a split id (manual parallelization)
+
+            elif 'gr' in self.mtype:
+                mdl_multi_obs.group_classify_parallel(mdl,test)
+                hdist, hmeans, sdist, smeans = mdl_multi_obs.group_infer(mdl)
+                self.h_ae, self.s_ae, self.h_se, self.s_se, self.h_lp, self.s_lp = mdl_multi_obs.group_compute_metrics(test)
+                grp_out.append((self.h_ae, self.s_ae, self.h_se, self.s_se, self.h_lp, self.s_lp))
+        return grp_out
+
 
 
 if __name__ == '__main__':
